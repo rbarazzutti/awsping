@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/binary"
 	"flag"
 	"fmt"
+	"log"
 	"math/rand"
 	"net"
 	"net/http"
@@ -12,6 +14,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/net/icmp"
+	"golang.org/x/net/ipv4"
 )
 
 var (
@@ -21,11 +26,13 @@ var (
 )
 
 var (
-	repeats = flag.Int("repeats", 1, "Number of repeats")
-	useHTTP = flag.Bool("http", false, "Use http transport (default is tcp)")
-	showVer = flag.Bool("v", false, "Show version")
-	verbose = flag.Int("verbose", 0, "Verbosity level")
-	service = flag.String("service", "dynamodb", "AWS Service: ec2, sdb, sns, sqs, ...")
+	repeats  = flag.Int("repeats", 1, "Number of repeats")
+	useHTTP  = flag.Bool("http", false, "Use http transport (default is tcp)")
+	useHTTPS = flag.Bool("https", false, "Use https transport (default is tcp)")
+	useICMP  = flag.Bool("icmp", false, "Use ICMP transport (default is tcp)")
+	showVer  = flag.Bool("v", false, "Show version")
+	verbose  = flag.Int("verbose", 0, "Verbosity level")
+	service  = flag.String("service", "dynamodb", "AWS Service: ec2, sdb, sns, sqs, ...")
 )
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -50,6 +57,84 @@ type AWSRegion struct {
 	Service   string
 	Latencies []time.Duration
 	Error     error
+}
+
+func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	targetHost := fmt.Sprintf("%s.%s.amazonaws.com", r.Service, r.Code)
+	targetIP, err := net.ResolveIPAddr("ip4", targetHost)
+
+	if err == err {
+	}
+	if err != nil {
+		r.Error = err
+		return
+	}
+
+	b := make([]byte, 56)
+	for i := 0; i < 56; i++ {
+		b[i] = byte(i)
+
+	}
+
+	c, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
+	if err != nil {
+		log.Fatalf("listen err, %s", err)
+	}
+	defer c.Close()
+
+	ms := time.Now().UnixMicro()
+
+	binary.BigEndian.PutUint32(b, uint32(ms/1e6))
+	binary.BigEndian.PutUint32(b[4:], uint32(ms%1e6))
+
+	wm := icmp.Message{
+		Type: ipv4.ICMPTypeEcho, Code: 0,
+		Body: &icmp.Echo{
+			ID:   os.Getpid() & 0xffff,
+			Seq:  0,
+			Data: b,
+		},
+	}
+	wb, err := wm.Marshal(nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if _, err := c.WriteTo(wb, targetIP); err != nil {
+		log.Fatalf("WriteTo err, %s", err)
+	}
+
+	rb := make([]byte, 1500)
+	var delay = int64(-1)
+	c.SetReadDeadline(time.Now().Add(time.Second * 2))
+	for {
+
+		n, peer, err := c.ReadFrom(rb)
+		if err != nil {
+			log.Fatal(err)
+		}
+		rm, err := icmp.ParseMessage(ipv4.ICMPTypeEchoReply.Protocol(), rb[:n])
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		body, _ := rm.Body.(*icmp.Echo)
+
+		msgTs := int64(binary.BigEndian.Uint32(body.Data))*1e6 + int64(binary.BigEndian.Uint32(body.Data[4:]))
+
+		delay = time.Now().UnixMicro() - int64(msgTs)
+
+		if rm.Type == ipv4.ICMPTypeEchoReply && peer.String() == targetIP.String() {
+
+			break
+		}
+
+	}
+	r.Latencies = append(r.Latencies, time.Duration(delay)*time.Microsecond)
+
+	r.Error = err
+
 }
 
 // CheckLatencyHTTP Test Latency via HTTP
@@ -124,7 +209,7 @@ func (rs AWSRegions) Swap(i, j int) {
 }
 
 // CalcLatency returns list of aws regions sorted by Latency
-func CalcLatency(repeats int, useHTTP bool, service string) *AWSRegions {
+func CalcLatency(repeats int, useHTTP bool, useHTTPS bool, useICMP bool, service string) *AWSRegions {
 	regions := AWSRegions{
 		{Service: service, Name: "US-East (Virginia)", Code: "us-east-1"},
 		{Service: service, Name: "US-East (Ohio)", Code: "us-east-2"},
@@ -156,6 +241,8 @@ func CalcLatency(repeats int, useHTTP bool, service string) *AWSRegions {
 		for i := range regions {
 			if useHTTP {
 				go regions[i].CheckLatencyHTTP(&wg)
+			} else if useICMP {
+				go regions[i].CheckLatencyICMP(&wg)
 			} else {
 				go regions[i].CheckLatencyTCP(&wg)
 			}
@@ -233,7 +320,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	regions := CalcLatency(*repeats, *useHTTP, *service)
+	regions := CalcLatency(*repeats, *useHTTP, *useHTTPS, *useICMP, *service)
 	lo := LatencyOutput{*verbose}
 	lo.Show(regions)
 }
