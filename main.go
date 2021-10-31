@@ -60,10 +60,13 @@ type AWSRegion struct {
 
 // CheckLatencyHTTP Test Latency via ICMP
 func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup) {
+	const DataSize = 56
+
 	defer wg.Done()
 
 	targetHost := fmt.Sprintf("%s.%s.amazonaws.com", r.Service, r.Code)
 	targetIP, err := net.ResolveIPAddr("ip4", targetHost)
+	shortPid := os.Getpid() & 0xffff
 
 	if err == err {
 	}
@@ -72,38 +75,39 @@ func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup) {
 		return
 	}
 
-	const DataSize = 56
-
-	b := make([]byte, DataSize)
+	buf := make([]byte, DataSize)
 	for i := 0; i < DataSize; i++ {
-		b[i] = byte(i)
+		buf[i] = byte(i)
 	}
 
 	c, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
 		println("Failed to set up an ICMP endpoint.")
-		println("note: ICMP pings need root access")
+		println("note: ICMP ping requires root access or cap_net_raw=ep capability")
 		os.Exit(1)
 	}
+
 	defer c.Close()
 
-	ms := time.Now().UnixMicro()
+	{
+		startTimeStampMicro := time.Now().UnixMicro()
 
-	binary.BigEndian.PutUint32(b, uint32(ms/1e6))
-	binary.BigEndian.PutUint32(b[4:], uint32(ms%1e6))
+		binary.BigEndian.PutUint32(buf, uint32(startTimeStampMicro/1e6))
+		binary.BigEndian.PutUint32(buf[4:], uint32(startTimeStampMicro%1e6))
 
-	wm := icmp.Message{
-		Type: ipv4.ICMPTypeEcho, Code: 0,
-		Body: &icmp.Echo{
-			ID:   os.Getpid() & 0xffff,
-			Seq:  0,
-			Data: b,
-		},
+		wm := icmp.Message{
+			Type: ipv4.ICMPTypeEcho, Code: 0,
+			Body: &icmp.Echo{
+				ID:   shortPid,
+				Seq:  0,
+				Data: buf,
+			},
+		}
+
+		wb, _ := wm.Marshal(nil)
+
+		c.WriteTo(wb, targetIP)
 	}
-
-	wb, _ := wm.Marshal(nil)
-
-	c.WriteTo(wb, targetIP)
 
 	rb := make([]byte, 1500)
 	var delay = int64(-1)
@@ -118,16 +122,18 @@ func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup) {
 
 			if rm.Type == ipv4.ICMPTypeEchoReply && peer.String() == targetIP.String() {
 				body, _ := rm.Body.(*icmp.Echo)
-				msgTs := int64(binary.BigEndian.Uint32(body.Data))*1e6 + int64(binary.BigEndian.Uint32(body.Data[4:]))
-				delay = time.Now().UnixMicro() - int64(msgTs)
-				break
+				if body.ID == shortPid {
+					messageTimestampMicro := int64(binary.BigEndian.Uint32(body.Data))*1e6 + int64(binary.BigEndian.Uint32(body.Data[4:]))
+					delay = time.Now().UnixMicro() - int64(messageTimestampMicro)
+					break
+				}
 			}
 		}
 	}
+
 	r.Latencies = append(r.Latencies, time.Duration(delay)*time.Microsecond)
 
 	r.Error = err
-
 }
 
 // CheckLatencyHTTP Test Latency via HTTP
