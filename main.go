@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
-	"log"
 	"math/rand"
 	"net"
 	"net/http"
@@ -59,6 +58,7 @@ type AWSRegion struct {
 	Error     error
 }
 
+// CheckLatencyHTTP Test Latency via ICMP
 func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup) {
 	defer wg.Done()
 
@@ -81,7 +81,9 @@ func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup) {
 
 	c, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
-		log.Fatalf("listen err, %s", err)
+		println("Failed to set up an ICMP endpoint.")
+		println("note: ICMP pings need root access")
+		os.Exit(1)
 	}
 	defer c.Close()
 
@@ -98,39 +100,29 @@ func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup) {
 			Data: b,
 		},
 	}
-	wb, err := wm.Marshal(nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if _, err := c.WriteTo(wb, targetIP); err != nil {
-		log.Fatalf("WriteTo err, %s", err)
-	}
+
+	wb, _ := wm.Marshal(nil)
+
+	c.WriteTo(wb, targetIP)
 
 	rb := make([]byte, 1500)
 	var delay = int64(-1)
-	c.SetReadDeadline(time.Now().Add(time.Second * 2))
+	c.SetReadDeadline(time.Now().Add(time.Millisecond * 1000))
 	for {
 
 		n, peer, err := c.ReadFrom(rb)
 		if err != nil {
-			log.Fatal(err)
+			return
 		}
-		rm, err := icmp.ParseMessage(ipv4.ICMPTypeEchoReply.Protocol(), rb[:n])
-		if err != nil {
-			log.Fatal(err)
+		if rm, err := icmp.ParseMessage(ipv4.ICMPTypeEchoReply.Protocol(), rb[:n]); err == nil {
+
+			if rm.Type == ipv4.ICMPTypeEchoReply && peer.String() == targetIP.String() {
+				body, _ := rm.Body.(*icmp.Echo)
+				msgTs := int64(binary.BigEndian.Uint32(body.Data))*1e6 + int64(binary.BigEndian.Uint32(body.Data[4:]))
+				delay = time.Now().UnixMicro() - int64(msgTs)
+				break
+			}
 		}
-
-		body, _ := rm.Body.(*icmp.Echo)
-
-		msgTs := int64(binary.BigEndian.Uint32(body.Data))*1e6 + int64(binary.BigEndian.Uint32(body.Data[4:]))
-
-		delay = time.Now().UnixMicro() - int64(msgTs)
-
-		if rm.Type == ipv4.ICMPTypeEchoReply && peer.String() == targetIP.String() {
-
-			break
-		}
-
 	}
 	r.Latencies = append(r.Latencies, time.Duration(delay)*time.Microsecond)
 
