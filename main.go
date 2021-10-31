@@ -72,10 +72,11 @@ func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup) {
 		return
 	}
 
-	b := make([]byte, 56)
-	for i := 0; i < 56; i++ {
-		b[i] = byte(i)
+	const DataSize = 56
 
+	b := make([]byte, DataSize)
+	for i := 0; i < DataSize; i++ {
+		b[i] = byte(i)
 	}
 
 	c, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
