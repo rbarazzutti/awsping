@@ -38,7 +38,7 @@ var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 // Duration2ms converts time.Duration to ms (float64)
 func Duration2ms(d time.Duration) float64 {
-	return float64(d.Nanoseconds()) / 1000 / 1000
+	return float64(d.Milliseconds())
 }
 
 func mkRandoString(n int) string {
@@ -58,7 +58,7 @@ type AWSRegion struct {
 	Error     error
 }
 
-// CheckLatencyHTTP Test Latency via ICMP
+// CheckLatencyICMP Test Latency via ICMP
 func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup) {
 	const DataSize = 56
 
@@ -111,7 +111,7 @@ func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup) {
 
 	rb := make([]byte, 1500)
 	var delay = int64(-1)
-	c.SetReadDeadline(time.Now().Add(time.Millisecond * 1000))
+	c.SetReadDeadline(time.Now().Add(time.Second))
 	for {
 
 		n, peer, err := c.ReadFrom(rb)
