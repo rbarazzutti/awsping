@@ -137,9 +137,14 @@ func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup) {
 }
 
 // CheckLatencyHTTP Test Latency via HTTP
-func (r *AWSRegion) CheckLatencyHTTP(wg *sync.WaitGroup) {
+func (r *AWSRegion) CheckLatencyHTTP(wg *sync.WaitGroup, https bool) {
 	defer wg.Done()
-	url := fmt.Sprintf("http://%s.%s.amazonaws.com/ping?x=%s", r.Service,
+	proto := "http"
+	if https {
+		proto = "https"
+	}
+
+	url := fmt.Sprintf("%s://%s.%s.amazonaws.com/ping?x=%s", proto, r.Service,
 		r.Code, mkRandoString(13))
 	client := &http.Client{}
 
@@ -210,9 +215,9 @@ func (rs AWSRegions) Swap(i, j int) {
 // CalcLatency returns list of aws regions sorted by Latency
 func CalcLatency(repeats int, useHTTP bool, useHTTPS bool, useICMP bool, service string) *AWSRegions {
 	regions := AWSRegions{
-		{Service: service, Name: "US-East (Virginia)", Code: "us-east-1"},
+		{Service: service, Name: "US-East (N. Virginia)", Code: "us-east-1"},
 		{Service: service, Name: "US-East (Ohio)", Code: "us-east-2"},
-		{Service: service, Name: "US-West (California)", Code: "us-west-1"},
+		{Service: service, Name: "US-West (N. California)", Code: "us-west-1"},
 		{Service: service, Name: "US-West (Oregon)", Code: "us-west-2"},
 		{Service: service, Name: "Canada (Central)", Code: "ca-central-1"},
 		{Service: service, Name: "Europe (Ireland)", Code: "eu-west-1"},
@@ -222,7 +227,7 @@ func CalcLatency(repeats int, useHTTP bool, useHTTPS bool, useICMP bool, service
 		{Service: service, Name: "Europe (Paris)", Code: "eu-west-3"},
 		{Service: service, Name: "Europe (Stockholm)", Code: "eu-north-1"},
 		{Service: service, Name: "Africa (Cape Town)", Code: "af-south-1"},
-		{Service: service, Name: "Asia Pacific (Osaka-Local)", Code: "ap-northeast-3"},
+		{Service: service, Name: "Asia Pacific (Osaka)", Code: "ap-northeast-3"},
 		{Service: service, Name: "Asia Pacific (Hong Kong)", Code: "ap-east-1"},
 		{Service: service, Name: "Asia Pacific (Tokyo)", Code: "ap-northeast-1"},
 		{Service: service, Name: "Asia Pacific (Seoul)", Code: "ap-northeast-2"},
@@ -231,15 +236,14 @@ func CalcLatency(repeats int, useHTTP bool, useHTTPS bool, useICMP bool, service
 		{Service: service, Name: "Asia Pacific (Sydney)", Code: "ap-southeast-2"},
 		{Service: service, Name: "South America (São Paulo)", Code: "sa-east-1"},
 		{Service: service, Name: "Middle East (Bahrain)", Code: "me-south-1"},
-		{Service: service, Name: "South America (São Paulo)", Code: "sa-east-1"},
 	}
 	var wg sync.WaitGroup
 
 	for n := 1; n <= repeats; n++ {
 		wg.Add(len(regions))
 		for i := range regions {
-			if useHTTP {
-				go regions[i].CheckLatencyHTTP(&wg)
+			if useHTTP || useHTTPS {
+				go regions[i].CheckLatencyHTTP(&wg, useHTTPS)
 			} else if useICMP {
 				go regions[i].CheckLatencyICMP(&wg)
 			} else {
@@ -320,6 +324,7 @@ func main() {
 	}
 
 	regions := CalcLatency(*repeats, *useHTTP, *useHTTPS, *useICMP, *service)
+
 	lo := LatencyOutput{*verbose}
 	lo.Show(regions)
 }
