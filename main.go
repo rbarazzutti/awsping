@@ -68,7 +68,7 @@ type AWSRegion struct {
 }
 
 // CheckLatencyICMP Test Latency via ICMP
-func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup) {
+func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup, seq int) {
 	const DataSize = 56
 
 	defer wg.Done()
@@ -76,7 +76,7 @@ func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup) {
 	targetHost := fmt.Sprintf("%s.%s.amazonaws.com", r.Service, r.Code)
 	targetIP, err := net.ResolveIPAddr("ip4", targetHost)
 	shortPid := os.Getpid() & 0xffff
-	seq := int(rand.Int31()) & 0xffff
+	seq = seq & 0xffff
 
 	if err == err {
 	}
@@ -276,6 +276,7 @@ func CalcLatency(repeats int, useHTTP bool, useHTTPS bool, useICMP bool, service
 				go regions[i].CheckLatencyHTTP(&wg, useHTTPS)
 			} else if useICMP {
 				go regions[i].CheckLatencyICMP(&wg)
+				go regions[i].CheckLatencyICMP(&wg, n)
 			} else {
 				go regions[i].CheckLatencyTCP(&wg)
 			}
