@@ -100,11 +100,6 @@ func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup, seq int) {
 	defer c.Close()
 
 	{
-		startTimeStampMicro := time.Now().UnixMicro()
-
-		binary.BigEndian.PutUint32(buf, uint32(startTimeStampMicro/1e6))
-		binary.BigEndian.PutUint32(buf[4:], uint32(startTimeStampMicro%1e6))
-
 		wm := icmp.Message{
 			Type: ipv4.ICMPTypeEcho, Code: 0,
 			Body: &icmp.Echo{
@@ -113,6 +108,11 @@ func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup, seq int) {
 				Data: buf,
 			},
 		}
+
+		startTimeStampMicro := time.Now().UnixMicro()
+
+		binary.BigEndian.PutUint32(buf, uint32(startTimeStampMicro/1e6))
+		binary.BigEndian.PutUint32(buf[4:], uint32(startTimeStampMicro%1e6))
 
 		wb, _ := wm.Marshal(nil)
 
