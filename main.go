@@ -76,6 +76,7 @@ func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup) {
 	targetHost := fmt.Sprintf("%s.%s.amazonaws.com", r.Service, r.Code)
 	targetIP, err := net.ResolveIPAddr("ip4", targetHost)
 	shortPid := os.Getpid() & 0xffff
+	seq := int(rand.Int31()) & 0xffff
 
 	if err == err {
 	}
@@ -108,7 +109,7 @@ func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup) {
 			Type: ipv4.ICMPTypeEcho, Code: 0,
 			Body: &icmp.Echo{
 				ID:   shortPid,
-				Seq:  0,
+				Seq:  seq,
 				Data: buf,
 			},
 		}
@@ -122,7 +123,6 @@ func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup) {
 	var delay = FailedMeasurement
 	c.SetReadDeadline(time.Now().Add(time.Second))
 	for {
-
 		n, peer, err := c.ReadFrom(rb)
 		if err != nil {
 			break
@@ -131,7 +131,7 @@ func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup) {
 
 			if rm.Type == ipv4.ICMPTypeEchoReply && peer.String() == targetIP.String() {
 				body, _ := rm.Body.(*icmp.Echo)
-				if body.ID == shortPid {
+				if body.ID == shortPid && body.Seq == seq {
 					delay = Measurement(time.Since(time.Unix(int64(binary.BigEndian.Uint32(body.Data)), int64(binary.BigEndian.Uint32(body.Data[4:]))*1e3)))
 					break
 				}
