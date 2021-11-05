@@ -267,15 +267,14 @@ func CalcLatency(repeats int, useHTTP bool, useHTTPS bool, useICMP bool, service
 		{Service: service, Name: "South America (São Paulo)", Code: "sa-east-1"},
 		{Service: service, Name: "Middle East (Bahrain)", Code: "me-south-1"},
 	}
-	var wg sync.WaitGroup
 
 	for n := 1; n <= repeats; n++ {
+		var wg sync.WaitGroup
 		wg.Add(len(regions))
 		for i := range regions {
 			if useHTTP || useHTTPS {
 				go regions[i].CheckLatencyHTTP(&wg, useHTTPS)
 			} else if useICMP {
-				go regions[i].CheckLatencyICMP(&wg)
 				go regions[i].CheckLatencyICMP(&wg, n)
 			} else {
 				go regions[i].CheckLatencyTCP(&wg)
