@@ -68,10 +68,8 @@ type AWSRegion struct {
 }
 
 // CheckLatencyICMP Test Latency via ICMP
-func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup, seq int) {
+func (r *AWSRegion) CheckLatencyICMP(seq int) {
 	const DataSize = 56
-
-	defer wg.Done()
 
 	targetHost := fmt.Sprintf("%s.%s.amazonaws.com", r.Service, r.Code)
 	targetIP, err := net.ResolveIPAddr("ip4", targetHost)
@@ -145,8 +143,7 @@ func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup, seq int) {
 }
 
 // CheckLatencyHTTP Test Latency via HTTP
-func (r *AWSRegion) CheckLatencyHTTP(wg *sync.WaitGroup, https bool) {
-	defer wg.Done()
+func (r *AWSRegion) CheckLatencyHTTP(https bool) {
 	proto := "http"
 	if https {
 		proto = "https"
@@ -167,8 +164,7 @@ func (r *AWSRegion) CheckLatencyHTTP(wg *sync.WaitGroup, https bool) {
 }
 
 // CheckLatencyTCP Test Latency via TCP
-func (r *AWSRegion) CheckLatencyTCP(wg *sync.WaitGroup) {
-	defer wg.Done()
+func (r *AWSRegion) CheckLatencyTCP() {
 	tcpURI := fmt.Sprintf("%s.%s.amazonaws.com:80", r.Service, r.Code)
 	tcpAddr, err := net.ResolveTCPAddr("tcp4", tcpURI)
 	if err != nil {
@@ -272,13 +268,16 @@ func CalcLatency(repeats int, useHTTP bool, useHTTPS bool, useICMP bool, service
 		var wg sync.WaitGroup
 		wg.Add(len(regions))
 		for i := range regions {
-			if useHTTP || useHTTPS {
-				go regions[i].CheckLatencyHTTP(&wg, useHTTPS)
-			} else if useICMP {
-				go regions[i].CheckLatencyICMP(&wg, n)
-			} else {
-				go regions[i].CheckLatencyTCP(&wg)
-			}
+			go func(i int) {
+				defer wg.Done()
+				if useHTTP || useHTTPS {
+					regions[i].CheckLatencyHTTP(useHTTPS)
+				} else if useICMP {
+					regions[i].CheckLatencyICMP(n)
+				} else {
+					regions[i].CheckLatencyTCP()
+				}
+			}(i)
 		}
 		wg.Wait()
 	}
