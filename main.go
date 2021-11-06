@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
-	"math"
 	"math/rand"
 	"net"
 	"net/http"
@@ -36,15 +35,6 @@ var (
 )
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
-// Measurement2ms converts Measurement to ms (float64)
-func Measurement2ms(m Measurement) float64 {
-	if m.isValid() {
-		return float64(time.Duration(m).Microseconds()) / 1000
-	} else {
-		return float64(math.NaN())
-	}
-}
 
 func mkRandoString(n int) string {
 	b := make([]rune, n)
@@ -204,12 +194,21 @@ func (m Measurement) isValid() bool {
 	return int64(time.Duration(m)) >= int64(0)
 }
 
+func (m Measurement) toStr() string {
+	if m.isValid() {
+		return fmt.Sprintf("%.2f ms", float64(time.Duration(m).Microseconds())/1000)
+	} else {
+		return "undef"
+	}
+}
+
 // GetLatencyStr returns Latency in string
 func (r *AWSRegion) GetLatencyStr() string {
+
 	if r.Error != nil {
 		return r.Error.Error()
 	}
-	return fmt.Sprintf("%.2f ms", Measurement2ms(r.GetLatency()))
+	return r.GetLatency().toStr()
 }
 
 // AWSRegions slice of the AWSRegion
@@ -323,10 +322,9 @@ func (lo *LatencyOutput) show2(regions *AWSRegions) {
 	for i, r := range *regions {
 		outData := []interface{}{strconv.Itoa(i), r.Code, r.Name}
 		for n := 0; n < *repeats; n++ {
-			outData = append(outData, fmt.Sprintf("%.2f ms",
-				Measurement2ms(r.Latencies[n])))
+			outData = append(outData, r.Latencies[n].toStr())
 		}
-		outData = append(outData, fmt.Sprintf("%.2f ms", Measurement2ms(r.GetLatency())))
+		outData = append(outData, r.GetLatency().toStr())
 		fmt.Printf(outFmt, outData...)
 	}
 }
