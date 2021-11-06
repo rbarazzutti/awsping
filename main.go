@@ -198,7 +198,7 @@ func (m Measure) toStr() string {
 	if m.isValid() {
 		return fmt.Sprintf("%.2f ms", float64(time.Duration(m).Microseconds())/1000)
 	} else {
-		return "undef"
+		return "timeout"
 	}
 }
 
