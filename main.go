@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
+	"math"
 	"math/rand"
 	"net"
 	"net/http"
@@ -36,9 +37,13 @@ var (
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
-// Duration2ms converts time.Duration to ms (float64)
-func Duration2ms(d time.Duration) float64 {
-	return float64(d.Milliseconds())
+// Measurement2ms converts Measurement to ms (float64)
+func Measurement2ms(m Measurement) float64 {
+	if m.isValid() {
+		return float64(time.Duration(m).Microseconds()) / 1000
+	} else {
+		return float64(math.NaN())
+	}
 }
 
 func mkRandoString(n int) string {
@@ -49,12 +54,16 @@ func mkRandoString(n int) string {
 	return string(b)
 }
 
+type Measurement time.Duration
+
+const FailedMeasurement = Measurement(-1)
+
 // AWSRegion description of the AWS EC2 region
 type AWSRegion struct {
 	Name      string
 	Code      string
 	Service   string
-	Latencies []time.Duration
+	Latencies []Measurement
 	Error     error
 }
 
@@ -110,28 +119,27 @@ func (r *AWSRegion) CheckLatencyICMP(wg *sync.WaitGroup) {
 	}
 
 	rb := make([]byte, 1500)
-	var delay = int64(-1)
+	var delay = FailedMeasurement
 	c.SetReadDeadline(time.Now().Add(time.Second))
 	for {
 
 		n, peer, err := c.ReadFrom(rb)
 		if err != nil {
-			return
+			break
 		}
 		if rm, err := icmp.ParseMessage(ipv4.ICMPTypeEchoReply.Protocol(), rb[:n]); err == nil {
 
 			if rm.Type == ipv4.ICMPTypeEchoReply && peer.String() == targetIP.String() {
 				body, _ := rm.Body.(*icmp.Echo)
 				if body.ID == shortPid {
-					messageTimestampMicro := int64(binary.BigEndian.Uint32(body.Data))*1e6 + int64(binary.BigEndian.Uint32(body.Data[4:]))
-					delay = time.Now().UnixMicro() - int64(messageTimestampMicro)
+					delay = Measurement(time.Since(time.Unix(int64(binary.BigEndian.Uint32(body.Data)), int64(binary.BigEndian.Uint32(body.Data[4:]))*1e3)))
 					break
 				}
 			}
 		}
 	}
 
-	r.Latencies = append(r.Latencies, time.Duration(delay)*time.Microsecond)
+	r.Latencies = append(r.Latencies, delay)
 
 	r.Error = err
 }
@@ -150,10 +158,9 @@ func (r *AWSRegion) CheckLatencyHTTP(wg *sync.WaitGroup, https bool) {
 
 	req, err := http.NewRequest("GET", url, nil)
 	req.Header.Set("User-Agent", useragent)
-
 	start := time.Now()
 	resp, err := client.Do(req)
-	r.Latencies = append(r.Latencies, time.Since(start))
+	r.Latencies = append(r.Latencies, Measurement(time.Since(start)))
 	defer resp.Body.Close()
 
 	r.Error = err
@@ -174,19 +181,31 @@ func (r *AWSRegion) CheckLatencyTCP(wg *sync.WaitGroup) {
 		r.Error = err
 		return
 	}
-	r.Latencies = append(r.Latencies, time.Since(start))
+	r.Latencies = append(r.Latencies, Measurement(time.Since(start)))
 	defer conn.Close()
 
 	r.Error = err
 }
 
 // GetLatency returns Latency in ms
-func (r *AWSRegion) GetLatency() float64 {
-	sum := float64(0)
+func (r *AWSRegion) GetLatency() Measurement {
+	sum := Measurement(0)
+	count := int64(0)
 	for _, l := range r.Latencies {
-		sum += Duration2ms(l)
+		if l.isValid() {
+			count++
+			sum += l
+		}
 	}
-	return sum / float64(len(r.Latencies))
+	if count > 0 {
+		return Measurement(int64(sum) / count)
+	} else {
+		return FailedMeasurement
+	}
+}
+
+func (m Measurement) isValid() bool {
+	return int64(time.Duration(m)) >= int64(0)
 }
 
 // GetLatencyStr returns Latency in string
@@ -194,7 +213,7 @@ func (r *AWSRegion) GetLatencyStr() string {
 	if r.Error != nil {
 		return r.Error.Error()
 	}
-	return fmt.Sprintf("%.2f ms", r.GetLatency())
+	return fmt.Sprintf("%.2f ms", Measurement2ms(r.GetLatency()))
 }
 
 // AWSRegions slice of the AWSRegion
@@ -205,7 +224,18 @@ func (rs AWSRegions) Len() int {
 }
 
 func (rs AWSRegions) Less(i, j int) bool {
-	return rs[i].GetLatency() < rs[j].GetLatency()
+	a := rs[i].GetLatency()
+	b := rs[j].GetLatency()
+
+	if a.isValid() && b.isValid() && a != b {
+		return a < b
+	} else if a.isValid() && !b.isValid() {
+		return true
+	} else if !a.isValid() && b.isValid() {
+		return false
+	} else {
+		return rs[i].Code < rs[j].Code
+	}
 }
 
 func (rs AWSRegions) Swap(i, j int) {
@@ -295,9 +325,9 @@ func (lo *LatencyOutput) show2(regions *AWSRegions) {
 		outData := []interface{}{strconv.Itoa(i), r.Code, r.Name}
 		for n := 0; n < *repeats; n++ {
 			outData = append(outData, fmt.Sprintf("%.2f ms",
-				Duration2ms(r.Latencies[n])))
+				Measurement2ms(r.Latencies[n])))
 		}
-		outData = append(outData, fmt.Sprintf("%.2f ms", r.GetLatency()))
+		outData = append(outData, fmt.Sprintf("%.2f ms", Measurement2ms(r.GetLatency())))
 		fmt.Printf(outFmt, outData...)
 	}
 }
