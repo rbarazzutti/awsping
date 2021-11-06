@@ -44,16 +44,16 @@ func mkRandoString(n int) string {
 	return string(b)
 }
 
-type Measurement time.Duration
+type Measure time.Duration
 
-const FailedMeasurement = Measurement(-1)
+const FailedMeasure = Measure(-1)
 
 // AWSRegion description of the AWS EC2 region
 type AWSRegion struct {
 	Name      string
 	Code      string
 	Service   string
-	Latencies []Measurement
+	Latencies []Measure
 	Error     error
 }
 
@@ -108,7 +108,7 @@ func (r *AWSRegion) CheckLatencyICMP(seq int) {
 	}
 
 	rb := make([]byte, 1500)
-	var delay = FailedMeasurement
+	var delay = FailedMeasure
 	c.SetReadDeadline(time.Now().Add(time.Second))
 	for {
 		n, peer, err := c.ReadFrom(rb)
@@ -120,7 +120,7 @@ func (r *AWSRegion) CheckLatencyICMP(seq int) {
 			if rm.Type == ipv4.ICMPTypeEchoReply && peer.String() == targetIP.String() {
 				body, _ := rm.Body.(*icmp.Echo)
 				if body.ID == shortPid && body.Seq == seq {
-					delay = Measurement(time.Since(time.Unix(int64(binary.BigEndian.Uint32(body.Data)), int64(binary.BigEndian.Uint32(body.Data[4:]))*1e3)))
+					delay = Measure(time.Since(time.Unix(int64(binary.BigEndian.Uint32(body.Data)), int64(binary.BigEndian.Uint32(body.Data[4:]))*1e3)))
 					break
 				}
 			}
@@ -147,7 +147,7 @@ func (r *AWSRegion) CheckLatencyHTTP(https bool) {
 	req.Header.Set("User-Agent", useragent)
 	start := time.Now()
 	resp, err := client.Do(req)
-	r.Latencies = append(r.Latencies, Measurement(time.Since(start)))
+	r.Latencies = append(r.Latencies, Measure(time.Since(start)))
 	defer resp.Body.Close()
 
 	r.Error = err
@@ -167,15 +167,15 @@ func (r *AWSRegion) CheckLatencyTCP() {
 		r.Error = err
 		return
 	}
-	r.Latencies = append(r.Latencies, Measurement(time.Since(start)))
+	r.Latencies = append(r.Latencies, Measure(time.Since(start)))
 	defer conn.Close()
 
 	r.Error = err
 }
 
 // GetLatency returns Latency in ms
-func (r *AWSRegion) GetLatency() Measurement {
-	sum := Measurement(0)
+func (r *AWSRegion) GetLatency() Measure {
+	sum := Measure(0)
 	count := int64(0)
 	for _, l := range r.Latencies {
 		if l.isValid() {
@@ -184,17 +184,17 @@ func (r *AWSRegion) GetLatency() Measurement {
 		}
 	}
 	if count > 0 {
-		return Measurement(int64(sum) / count)
+		return Measure(int64(sum) / count)
 	} else {
-		return FailedMeasurement
+		return FailedMeasure
 	}
 }
 
-func (m Measurement) isValid() bool {
+func (m Measure) isValid() bool {
 	return int64(time.Duration(m)) >= int64(0)
 }
 
-func (m Measurement) toStr() string {
+func (m Measure) toStr() string {
 	if m.isValid() {
 		return fmt.Sprintf("%.2f ms", float64(time.Duration(m).Microseconds())/1000)
 	} else {
