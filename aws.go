@@ -28,17 +28,9 @@ type AWSRegion struct {
 func (r *AWSRegion) CheckLatencyICMP(seq int) {
 	const DataSize = 56
 
-	targetHost := fmt.Sprintf("%s.%s.amazonaws.com", r.Service, r.Code)
-	targetIP, err := net.ResolveIPAddr("ip4", targetHost)
+	targetIP := r.GetTarget().IPAddr
 	shortPid := os.Getpid() & 0xffff
 	seq = seq & 0xffff
-
-	if err == err {
-	}
-	if err != nil {
-		r.Error = err
-		return
-	}
 
 	buf := make([]byte, DataSize)
 	for i := 0; i < DataSize; i++ {
