@@ -29,13 +29,22 @@ buildall: clean
 	@mkdir -p ${BUILD_DIR}
 	@for os in "${BUILD_OS}" ; do \
 		for arch in "${BUILD_ARCH}" ; do \
-			echo " * build $$os for $$arch"; \
-			GOOS=$$os GOARCH=$$arch go build -ldflags "-s" -o ${BUILD_DIR}/${EXEC} ${SRC_CMD}; \
-			cd ${BUILD_DIR}; \
-			tar czf ${EXEC}.$$os.$$arch.tgz ${EXEC}; \
-			cd - ; \
-		done done
-	@rm ${BUILD_DIR}/${EXEC}
+			if [ $$os != "darwin" ] || [ $$arch != "386" ]; then \
+				if [ $$os != "windows" ]; then \
+					EXEC_FILE=${EXEC};\
+				else\
+					EXEC_FILE=${EXEC}.exe;\
+				fi;\
+				echo " * build $$os for $$arch"; \
+				GOOS=$$os GOARCH=$$arch go build -ldflags "-s" -o ${BUILD_DIR}/$$EXEC_FILE ${SRC_CMD}; \
+				cd ${BUILD_DIR}; \
+				tar czf ${EXEC}.$$os.$$arch.tgz $$EXEC_FILE; \
+				rm -f $$EXEC_FILE; \
+				cd -  > /dev/null ; \
+			fi;\
+		done \
+	done
+	
 
 docker:
 	docker build -t awsping .

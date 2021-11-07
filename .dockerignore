@@ -1,5 +1,6 @@
-.git
-LICENSE
-README.md
-Dockerfile
-awsping
+/.git
+/build
+/LICENSE
+/README.md
+/Dockerfile
+/awsping
