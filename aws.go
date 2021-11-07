@@ -22,6 +22,7 @@ const FailedMeasure = Measure(-1)
 type AWSRegion struct {
 	Name      string
 	Code      string
+	DomainExt string
 	Service   string
 	Latencies []Measure
 	Error     error
@@ -129,7 +130,7 @@ func (r *AWSRegion) CheckLatencyHTTP(https bool) {
 
 func (r *AWSRegion) GetTarget() AWSTarget {
 
-	hostname := fmt.Sprintf("%s.%s.amazonaws.com", r.Service, r.Code)
+	hostname := fmt.Sprintf("%s.%s.amazonaws.com%s", r.Service, r.Code, r.DomainExt)
 	ipAddr, _ := net.ResolveIPAddr("ip4", hostname)
 
 	return AWSTarget{
@@ -238,6 +239,10 @@ func GetRegions(service string) AWSRegions {
 		{Service: service, Name: "Asia Pacific (Sydney)", Code: "ap-southeast-2"},
 		{Service: service, Name: "South America (São Paulo)", Code: "sa-east-1"},
 		{Service: service, Name: "Middle East (Bahrain)", Code: "me-south-1"},
+		{Service: service, Name: "AWS GovCloud (US-East)", Code: "us-gov-east-1"},
+		{Service: service, Name: "AWS GovCloud (US-West)", Code: "us-gov-west-1"},
+		{Service: service, Name: "China (Beijing)", Code: "cn-north-1", DomainExt: ".cn"},
+		{Service: service, Name: "China (Ningxia)", Code: "cn-northwest-1", DomainExt: ".cn"},
 	}
 
 }
