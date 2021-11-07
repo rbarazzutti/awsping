@@ -105,8 +105,13 @@ type AWSTarget struct {
 }
 
 // CheckLatencyHTTP Test Latency via HTTP
+
 func (r *AWSRegion) CheckLatencyHTTP(https bool) {
-	url := fmt.Sprintf("http://%s/ping?x=%s", r.GetTarget().Hostname, mkRandoString(13))
+	proto := "http"
+	if https {
+		proto = "https"
+	}
+	url := fmt.Sprintf("%s://%s/ping?x=%s", proto, r.GetTarget().Hostname, mkRandoString(13))
 
 	client := &http.Client{}
 
@@ -126,7 +131,10 @@ func (r *AWSRegion) CheckLatencyHTTP(https bool) {
 func (r *AWSRegion) GetTarget() AWSTarget {
 
 	hostname := fmt.Sprintf("%s.%s.amazonaws.com", r.Service, r.Code)
-	ipAddr, _ := net.ResolveIPAddr("ip4", hostname)
+	ipAddr, err := net.ResolveIPAddr("ip4", hostname)
+	if err != nil {
+		r.Error = err
+	}
 
 	return AWSTarget{
 		Hostname: hostname,

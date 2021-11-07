@@ -2,7 +2,9 @@ package awsping
 
 import (
 	"fmt"
+	"io"
 	"math/rand"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -32,25 +34,34 @@ func mkRandoString(n int) string {
 type LatencyOutput struct {
 	Level   int
 	Repeats int
+	w       io.Writer
+}
+
+func NewOutput(level, repeats int) *LatencyOutput {
+	return &LatencyOutput{
+		Level:   level,
+		Repeats: repeats,
+		w:       os.Stdout,
+	}
 }
 
 func (lo *LatencyOutput) show(regions *AWSRegions) {
 	for _, r := range *regions {
-		fmt.Printf("%-15s %-20s\n", r.Code, r.Name)
+		fmt.Fprintf(lo.w, "%-15s %-20s\n", r.Code, r.Name)
 	}
 }
 
 func (lo *LatencyOutput) show0(regions *AWSRegions) {
 	for _, r := range *regions {
-		fmt.Printf("%-25s %20s\n", r.Name, r.GetLatency().toStr())
+		fmt.Fprintf(lo.w, "%-25s %20s\n", r.Name, r.GetLatency().toStr())
 	}
 }
 
 func (lo *LatencyOutput) show1(regions *AWSRegions) {
 	outFmt := "%5v %-15s %-30s %20s\n"
-	fmt.Printf(outFmt, "", "Code", "Region", "Latency")
+	fmt.Fprintf(lo.w, outFmt, "", "Code", "Region", "Latency")
 	for i, r := range *regions {
-		fmt.Printf(outFmt, i, r.Code, r.Name, r.GetLatency().toStr())
+		fmt.Fprintf(lo.w, outFmt, i, r.Code, r.Name, r.GetLatency().toStr())
 	}
 }
 
@@ -66,7 +77,7 @@ func (lo *LatencyOutput) show2(regions *AWSRegions) {
 	outStr = append(outStr, "Avg Latency")
 
 	// show header
-	fmt.Printf(outFmt, outStr...)
+	fmt.Fprintf(lo.w, outFmt, outStr...)
 
 	// each region stats
 	for i, r := range *regions {
@@ -75,7 +86,7 @@ func (lo *LatencyOutput) show2(regions *AWSRegions) {
 			outData = append(outData, r.GetLatency().toStr())
 		}
 		outData = append(outData, r.GetLatency().toStr())
-		fmt.Printf(outFmt, outData...)
+		fmt.Fprintf(lo.w, outFmt, outData...)
 	}
 }
 

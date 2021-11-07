@@ -9,11 +9,12 @@ SRC_CMD=cmd/awsping/main.go
 build:
 	go build -o ${EXEC} ${SRC_CMD}
 
+# make run ARGS="-h"
 run:
-	go run cmd/awsping/main.go
+	go run cmd/awsping/main.go $(ARGS)
 
 test:
-	@go test -v
+	@go test -cover .
 
 release: buildall
 	git tag `grep "Version" utils.go | grep -o -E '[0-9]\.[0-9]\.[0-9]{1,2}'`
