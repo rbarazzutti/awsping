@@ -83,7 +83,7 @@ func (lo *LatencyOutput) show2(regions *AWSRegions) {
 	for i, r := range *regions {
 		outData := []interface{}{strconv.Itoa(i), r.Code, r.Name}
 		for n := 0; n < lo.Repeats; n++ {
-			outData = append(outData, r.GetLatency().toStr())
+			outData = append(outData, r.Latencies[n].toStr())
 		}
 		outData = append(outData, r.GetLatency().toStr())
 		fmt.Fprintf(lo.w, outFmt, outData...)
