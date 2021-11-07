@@ -14,10 +14,6 @@ import (
 	"golang.org/x/net/ipv4"
 )
 
-type Measure time.Duration
-
-const FailedMeasure = Measure(-1)
-
 // AWSRegion description of the AWS EC2 region
 type AWSRegion struct {
 	Name      string
@@ -173,18 +169,6 @@ func (r *AWSRegion) GetLatency() Measure {
 		return Measure(int64(sum) / count)
 	} else {
 		return FailedMeasure
-	}
-}
-
-func (m Measure) isValid() bool {
-	return int64(time.Duration(m)) >= int64(0)
-}
-
-func (m Measure) toStr() string {
-	if m.isValid() {
-		return fmt.Sprintf("%.2f ms", float64(time.Duration(m).Microseconds())/1000)
-	} else {
-		return "timeout"
 	}
 }
 

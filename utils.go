@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -89,5 +90,21 @@ func (lo *LatencyOutput) Show(regions *AWSRegions) {
 		lo.show1(regions)
 	case 2:
 		lo.show2(regions)
+	}
+}
+
+type Measure time.Duration
+
+const FailedMeasure = Measure(-1)
+
+func (m Measure) isValid() bool {
+	return int64(time.Duration(m)) >= int64(0)
+}
+
+func (m Measure) toStr() string {
+	if m.isValid() {
+		return fmt.Sprintf("%.1f ms", float64(time.Duration(m).Microseconds())/1000)
+	} else {
+		return "timeout"
 	}
 }
