@@ -1,6 +1,21 @@
 # awsping
 Console tool to check the latency to each AWS region
 
+# ToC
+
+* [Usage](#usage)
+  * [Test via TCP](#test-via-tcp)
+  * [Test via HTTP](#test-via-http)
+  * [Test via HTTPS](#test-via-https)
+  * [Test several times](#test-several-times)
+  * [Verbose mode](#verbose-mode)
+  * [Get Help](#get-help)
+* [Get binary file](#get-binary-file)
+* [Build from sources](#build-from-sources)
+* [Use with Docker](#use-with-docker)
+  * [Build a Docker image](#build-a-docker-image)
+  * [Run the Docker image](#run-the-docker-image)
+
 # Usage
 
 ## Test via TCP
@@ -118,6 +133,26 @@ Asia Pacific (Singapore)             378.53 ms
     9 ap-northeast-2  Asia Pacific (Seoul)            328.96 ms       327.65 ms       326.17 ms       327.59 ms
    10 ap-southeast-2  Asia Pacific (Sydney)           388.17 ms       347.74 ms       393.58 ms       376.50 ms
    11 ap-southeast-1  Asia Pacific (Singapore)        409.53 ms       403.61 ms       405.84 ms       406.33 ms
+```
+
+## Get Help
+
+```bash
+➜ ./awsping -h
+Usage of ./awsping:
+  -http
+    	Use http transport (default is tcp)
+  -https
+    	Use https transport (default is tcp)
+  -list-regions
+    	Show list of regions
+  -repeats int
+    	Number of repeats (default 1)
+  -service string
+    	AWS Service: ec2, sdb, sns, sqs, ... (default "dynamodb")
+  -v	Show version
+  -verbose int
+    	Verbosity level
 ```
 
 # Get binary file

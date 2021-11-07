@@ -1,48 +1,18 @@
-package main
+package awsping
 
 import (
 	"encoding/binary"
-	"flag"
 	"fmt"
-	"math/rand"
 	"net"
 	"net/http"
 	"os"
 	"sort"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
-
-var (
-	version   = "1.0.0"
-	github    = "https://github.com/ekalinin/awsping"
-	useragent = fmt.Sprintf("AwsPing/%s (+%s)", version, github)
-)
-
-var (
-	repeats  = flag.Int("repeats", 1, "Number of repeats")
-	useHTTP  = flag.Bool("http", false, "Use http transport (default is tcp)")
-	useHTTPS = flag.Bool("https", false, "Use https transport (default is tcp)")
-	useICMP  = flag.Bool("icmp", false, "Use ICMP transport (default is tcp)")
-	showVer  = flag.Bool("v", false, "Show version")
-	verbose  = flag.Int("verbose", 0, "Verbosity level")
-	service  = flag.String("service", "dynamodb", "AWS Service: ec2, sdb, sns, sqs, ...")
-)
-
-var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
-func mkRandoString(n int) string {
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
-	}
-	return string(b)
-}
 
 type Measure time.Duration
 
@@ -132,18 +102,22 @@ func (r *AWSRegion) CheckLatencyICMP(seq int) {
 	r.Error = err
 }
 
+// AWSTarget describes aws region network details (host, ip)
+type AWSTarget struct {
+	Hostname string
+	IPAddr   *net.IPAddr
+}
+
 // CheckLatencyHTTP Test Latency via HTTP
 func (r *AWSRegion) CheckLatencyHTTP(https bool) {
-	proto := "http"
-	if https {
-		proto = "https"
-	}
+	url := fmt.Sprintf("http://%s/ping?x=%s", r.GetTarget().Hostname, mkRandoString(13))
 
-	url := fmt.Sprintf("%s://%s.%s.amazonaws.com/ping?x=%s", proto, r.Service,
-		r.Code, mkRandoString(13))
 	client := &http.Client{}
 
 	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		r.Error = err
+	}
 	req.Header.Set("User-Agent", useragent)
 	start := time.Now()
 	resp, err := client.Do(req)
@@ -153,16 +127,28 @@ func (r *AWSRegion) CheckLatencyHTTP(https bool) {
 	r.Error = err
 }
 
+func (r *AWSRegion) GetTarget() AWSTarget {
+
+	hostname := fmt.Sprintf("%s.%s.amazonaws.com", r.Service, r.Code)
+	ipAddr, _ := net.ResolveIPAddr("ip4", hostname)
+
+	return AWSTarget{
+		Hostname: hostname,
+		IPAddr:   ipAddr,
+	}
+
+}
+
 // CheckLatencyTCP Test Latency via TCP
 func (r *AWSRegion) CheckLatencyTCP() {
-	tcpURI := fmt.Sprintf("%s.%s.amazonaws.com:80", r.Service, r.Code)
-	tcpAddr, err := net.ResolveTCPAddr("tcp4", tcpURI)
-	if err != nil {
-		r.Error = err
-		return
-	}
+
+	tcpAddr :=
+		net.TCPAddr{
+			IP:   r.GetTarget().IPAddr.IP,
+			Port: 80}
+
 	start := time.Now()
-	conn, err := net.DialTCP("tcp", nil, tcpAddr)
+	conn, err := net.DialTCP("tcp", nil, &tcpAddr)
 	if err != nil {
 		r.Error = err
 		return
@@ -202,15 +188,6 @@ func (m Measure) toStr() string {
 	}
 }
 
-// GetLatencyStr returns Latency in string
-func (r *AWSRegion) GetLatencyStr() string {
-
-	if r.Error != nil {
-		return r.Error.Error()
-	}
-	return r.GetLatency().toStr()
-}
-
 // AWSRegions slice of the AWSRegion
 type AWSRegions []AWSRegion
 
@@ -237,9 +214,9 @@ func (rs AWSRegions) Swap(i, j int) {
 	rs[i], rs[j] = rs[j], rs[i]
 }
 
-// CalcLatency returns list of aws regions sorted by Latency
-func CalcLatency(repeats int, useHTTP bool, useHTTPS bool, useICMP bool, service string) *AWSRegions {
-	regions := AWSRegions{
+// GetRegions returns a list of regions
+func GetRegions(service string) AWSRegions {
+	return AWSRegions{
 		{Service: service, Name: "US-East (N. Virginia)", Code: "us-east-1"},
 		{Service: service, Name: "US-East (Ohio)", Code: "us-east-2"},
 		{Service: service, Name: "US-West (N. California)", Code: "us-west-1"},
@@ -263,6 +240,12 @@ func CalcLatency(repeats int, useHTTP bool, useHTTPS bool, useICMP bool, service
 		{Service: service, Name: "Middle East (Bahrain)", Code: "me-south-1"},
 	}
 
+}
+
+// CalcLatency returns list of aws regions sorted by Latency
+func CalcLatency(repeats int, useHTTP bool, useHTTPS bool, useICMP bool, service string) *AWSRegions {
+	regions := GetRegions(service)
+
 	for n := 1; n <= repeats; n++ {
 		var wg sync.WaitGroup
 		wg.Add(len(regions))
@@ -283,79 +266,4 @@ func CalcLatency(repeats int, useHTTP bool, useHTTPS bool, useICMP bool, service
 
 	sort.Sort(regions)
 	return &regions
-}
-
-// LatencyOutput prints data into console
-type LatencyOutput struct {
-	Level int
-}
-
-func (lo *LatencyOutput) show0(regions *AWSRegions) {
-	for _, r := range *regions {
-		fmt.Printf("%-25s %20s\n", r.Name, r.GetLatencyStr())
-	}
-}
-
-func (lo *LatencyOutput) show1(regions *AWSRegions) {
-	outFmt := "%5v %-15s %-30s %20s\n"
-	fmt.Printf(outFmt, "", "Code", "Region", "Latency")
-	for i, r := range *regions {
-		fmt.Printf(outFmt, i, r.Code, r.Name, r.GetLatencyStr())
-	}
-}
-
-func (lo *LatencyOutput) show2(regions *AWSRegions) {
-	// format
-	outFmt := "%5v %-15s %-25s"
-	outFmt += strings.Repeat(" %15s", *repeats) + " %15s\n"
-	// header
-	outStr := []interface{}{"", "Code", "Region"}
-	for i := 0; i < *repeats; i++ {
-		outStr = append(outStr, "Try #"+strconv.Itoa(i+1))
-	}
-	outStr = append(outStr, "Avg Latency")
-
-	// show header
-	fmt.Printf(outFmt, outStr...)
-
-	// each region stats
-	for i, r := range *regions {
-		outData := []interface{}{strconv.Itoa(i), r.Code, r.Name}
-		for n := 0; n < *repeats; n++ {
-			outData = append(outData, r.Latencies[n].toStr())
-		}
-		outData = append(outData, r.GetLatency().toStr())
-		fmt.Printf(outFmt, outData...)
-	}
-}
-
-// Show print data
-func (lo *LatencyOutput) Show(regions *AWSRegions) {
-	switch lo.Level {
-	case 0:
-		lo.show0(regions)
-	case 1:
-		lo.show1(regions)
-	case 2:
-		lo.show2(regions)
-	}
-}
-
-func main() {
-
-	flag.Parse()
-
-	if *showVer {
-		fmt.Println(version)
-		os.Exit(0)
-	}
-
-	regions := CalcLatency(*repeats, *useHTTP, *useHTTPS, *useICMP, *service)
-
-	lo := LatencyOutput{*verbose}
-	lo.Show(regions)
-}
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
 }
