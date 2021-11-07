@@ -38,11 +38,12 @@ buildall: clean
 				GOOS=$$os GOARCH=$$arch go build -ldflags "-s" -o ${BUILD_DIR}/$$EXEC_FILE ${SRC_CMD}; \
 				cd ${BUILD_DIR}; \
 				tar czf ${EXEC}.$$os.$$arch.tgz $$EXEC_FILE; \
+				rm -f $$EXEC_FILE; \
 				cd -  > /dev/null ; \
 			fi;\
 		done \
 	done
-	@rm ${BUILD_DIR}/${EXEC}
+	
 
 docker:
 	docker build -t awsping .
