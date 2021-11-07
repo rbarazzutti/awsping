@@ -53,7 +53,7 @@ func (lo *LatencyOutput) show(regions *AWSRegions) {
 
 func (lo *LatencyOutput) show0(regions *AWSRegions) {
 	for _, r := range *regions {
-		fmt.Fprintf(lo.w, "%-25s %20s\n", r.Name, r.GetLatency().toStr())
+		fmt.Fprintf(lo.w, "%-25s %20s\n", r.Name, r.GetAvgLatency().toStr())
 	}
 }
 
@@ -61,7 +61,7 @@ func (lo *LatencyOutput) show1(regions *AWSRegions) {
 	outFmt := "%5v %-15s %-30s %20s\n"
 	fmt.Fprintf(lo.w, outFmt, "", "Code", "Region", "Latency")
 	for i, r := range *regions {
-		fmt.Fprintf(lo.w, outFmt, i, r.Code, r.Name, r.GetLatency().toStr())
+		fmt.Fprintf(lo.w, outFmt, i, r.Code, r.Name, r.GetAvgLatency().toStr())
 	}
 }
 
@@ -85,7 +85,7 @@ func (lo *LatencyOutput) show2(regions *AWSRegions) {
 		for n := 0; n < lo.Repeats; n++ {
 			outData = append(outData, r.Latencies[n].toStr())
 		}
-		outData = append(outData, r.GetLatency().toStr())
+		outData = append(outData, r.GetAvgLatency().toStr())
 		fmt.Fprintf(lo.w, outFmt, outData...)
 	}
 }

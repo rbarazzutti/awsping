@@ -157,7 +157,7 @@ func (r *AWSRegion) CheckLatencyTCP() {
 }
 
 // GetLatency returns Latency in ms
-func (r *AWSRegion) GetLatency() Measure {
+func (r *AWSRegion) GetAvgLatency() Measure {
 	sum := Measure(0)
 	count := int64(0)
 	for _, l := range r.Latencies {
@@ -181,8 +181,8 @@ func (rs AWSRegions) Len() int {
 }
 
 func (rs AWSRegions) Less(i, j int) bool {
-	a := rs[i].GetLatency()
-	b := rs[j].GetLatency()
+	a := rs[i].GetAvgLatency()
+	b := rs[j].GetAvgLatency()
 
 	if a.isValid() && b.isValid() && a != b {
 		return a < b
