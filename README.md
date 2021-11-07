@@ -81,6 +81,35 @@ Asia Pacific (Osaka)                1167.40 ms
 Asia Pacific (Sydney)               1328.90 ms
 ```
 
+## Test via ICMP
+
+```bash
+➥ ./awsping -icmp
+Europe (Frankfurt)                     14.5 ms
+Europe (Milan)                         19.1 ms
+Europe (Paris)                         24.9 ms
+Europe (London)                        29.7 ms
+Europe (Stockholm)                     34.6 ms
+Europe (Ireland)                       40.0 ms
+Middle East (Bahrain)                  94.2 ms
+US-East (N. Virginia)                  94.5 ms
+Canada (Central)                       99.3 ms
+US-East (Ohio)                        103.5 ms
+AWS GovCloud (US-East)                105.6 ms
+Asia Pacific (Mumbai)                 129.0 ms
+US-West (N. California)               154.4 ms
+AWS GovCloud (US-West)                168.8 ms
+US-West (Oregon)                      169.5 ms
+Africa (Cape Town)                    173.6 ms
+Asia Pacific (Singapore)              183.8 ms
+South America (São Paulo)             208.7 ms
+Asia Pacific (Tokyo)                  229.0 ms
+Asia Pacific (Osaka)                  244.9 ms
+Asia Pacific (Hong Kong)              259.8 ms
+Asia Pacific (Seoul)                  264.4 ms
+Asia Pacific (Sydney)                 289.4 ms
+```
+
 ## Test several times
 
 ```bash

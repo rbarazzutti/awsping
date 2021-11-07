@@ -14,9 +14,9 @@ import (
 
 var (
 	repeats     = flag.Int("repeats", 1, "Number of repeats")
-	useHTTP     = flag.Bool("http", false, "Use http transport (default is tcp)")
-	useHTTPS    = flag.Bool("https", false, "Use https transport (default is tcp)")
-	useICMP     = flag.Bool("icmp", false, "Use ICMP transport (default is tcp)")
+	useHTTP     = flag.Bool("http", false, "Use http transport    (default is tcp)")
+	useHTTPS    = flag.Bool("https", false, "Use https transport   (default is tcp)")
+	useICMP     = flag.Bool("icmp", false, "Use ICMP transport    (default is tcp)")
 	showVer     = flag.Bool("v", false, "Show version")
 	verbose     = flag.Int("verbose", 0, "Verbosity level")
 	service     = flag.String("service", "dynamodb", "AWS Service: ec2, sdb, sns, sqs, ...")
